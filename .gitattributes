@@ -4,4 +4,4 @@
 *.md text eol=lf
 *.toml text eol=lf
 *.yml text eol=lf
-wezterm-image-panel text eol=lf
+.githooks/* text eol=lf

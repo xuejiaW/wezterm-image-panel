@@ -6,7 +6,7 @@ import tempfile
 import unittest
 from unittest.mock import patch
 
-from session_detection import (detect, state_candidates, opened_rollouts,
+from wezterm_image_panel.detection import (detect, state_candidates, opened_rollouts,
                                resolve_posix_codex_pid, resolve_windows_codex_pid)
 
 
@@ -63,7 +63,7 @@ class DetectionTests(unittest.TestCase):
             opened.append(connection)
             return connection
 
-        with patch('session_detection.sqlite3.connect', side_effect=track):
+        with patch('wezterm_image_panel.detection.sqlite3.connect', side_effect=track):
             self.assertEqual(len(state_candidates(self.home, 'task | a', '/a')), 1)
         self.assertEqual(len(opened), 1)
         with self.assertRaises(sqlite3.ProgrammingError):
@@ -76,11 +76,11 @@ class DetectionTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, '--rollout'):
             state_candidates(self.home, 'task', '/a')
 
-    @patch('session_detection.subprocess.run', side_effect=FileNotFoundError)
+    @patch('wezterm_image_panel.detection.subprocess.run', side_effect=FileNotFoundError)
     def test_missing_lsof_allows_index_fallback(self, run):
         self.assertEqual(opened_rollouts(42), [])
 
-    @patch('session_detection.subprocess.run')
+    @patch('wezterm_image_panel.detection.subprocess.run')
     def test_rollout_identity_comes_from_metadata_not_filename_suffix(self, run):
         path=self.add('root-thread','task','/a')
         renamed=path.with_name('rollout-root-thread_generation-uuid.jsonl')
@@ -88,25 +88,25 @@ class DetectionTests(unittest.TestCase):
         run.return_value=subprocess.CompletedProcess([],0,stdout='n'+str(renamed)+'\n')
         self.assertEqual(opened_rollouts(42)[0]['id'],'root-thread')
 
-    @patch('session_detection.resolve_codex_pid', side_effect=ValueError('没有唯一的 Codex'))
+    @patch('wezterm_image_panel.detection.resolve_codex_pid', side_effect=ValueError('没有唯一的 Codex'))
     def test_shell_with_stale_codex_title_is_rejected(self, resolve):
         self.add('one','task','/a')
         with self.assertRaisesRegex(ValueError,'没有唯一的 Codex'):
             detect(42,'task | a','/a',self.home)
 
-    @patch('session_detection.subprocess.run')
+    @patch('wezterm_image_panel.detection.subprocess.run')
     def test_powershell_foreground_group_resolves_codex_child_only_on_same_tty(self, run):
         run.side_effect = [subprocess.CompletedProcess([],0,stdout='/usr/bin/pwsh\n'),
             subprocess.CompletedProcess([],0,stdout='42 1 ttys003 /usr/bin/pwsh\n43 42 ttys003 /opt/bin/codex\n44 43 ?? /opt/bin/codex\n45 1 ttys004 /opt/bin/codex\n')]
         self.assertEqual(resolve_posix_codex_pid(42),43)
 
-    @patch('session_detection.opened_rollouts', return_value=[])
-    @patch('session_detection.resolve_codex_pid', return_value=42)
+    @patch('wezterm_image_panel.detection.opened_rollouts', return_value=[])
+    @patch('wezterm_image_panel.detection.resolve_codex_pid', return_value=42)
     def test_local_tui_title_resolution(self, resolve, opened):
         self.add('one','task','/a')
         self.assertEqual(detect(42,'task | a','/a',self.home)[0]['id'],'one')
 
-    @patch('session_detection.windows_processes')
+    @patch('wezterm_image_panel.detection.windows_processes')
     def test_windows_tool_child_and_node_launcher_resolve_same_codex(self, processes):
         processes.return_value = {10: (1, 'pwsh.exe'), 11: (10, 'node.exe'),
                                   12: (11, 'codex.exe'), 13: (12, 'powershell.exe'),
@@ -114,7 +114,7 @@ class DetectionTests(unittest.TestCase):
         for pid in (10, 11, 12, 13):
             self.assertEqual(resolve_windows_codex_pid(pid), 12)
 
-    @patch('session_detection.windows_processes')
+    @patch('wezterm_image_panel.detection.windows_processes')
     def test_windows_multiple_codex_children_are_not_guessed(self, processes):
         processes.return_value = {10: (1, 'pwsh.exe'), 11: (10, 'codex.exe'),
                                   12: (10, 'codex.exe')}

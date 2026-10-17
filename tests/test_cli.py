@@ -8,7 +8,9 @@ import tempfile
 import unittest
 from unittest.mock import patch
 
-from wezterm_image_panel import main, SessionImages, image_dimensions, render
+from wezterm_image_panel.cli import main
+from wezterm_image_panel.sessions import SessionImages
+from wezterm_image_panel.viewer import image_dimensions, render
 from examples.create_demo_session import create, png
 from scripts.check_release import findings
 
@@ -62,7 +64,7 @@ class PublicReleaseTests(unittest.TestCase):
         reader = SessionImages(self.root / 'unused.jsonl', self.root / 'cache')
         reader.add_bytes(b'\x89PNG\r\n\x1a\n', 'truncated synthetic image')
         output = io.StringIO()
-        with redirect_stdout(output), patch('wezterm_image_panel.subprocess.run') as process:
+        with redirect_stdout(output), patch('wezterm_image_panel.viewer.subprocess.run') as process:
             status = render(reader, 0, False, 'unused-wezterm', (80, 24))
         self.assertFalse(status['render_ok'])
         self.assertIn('Cannot read image dimensions', status['render_error'])

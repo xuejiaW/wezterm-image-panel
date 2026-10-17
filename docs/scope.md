@@ -7,7 +7,7 @@ The first supported session source is **Codex CLI**. The current implementation
 reads its local JSONL records, optionally consults its SQLite index, snapshots
 supported image bytes, and keeps a gallery bound to that selected session.
 It targets native Windows and macOS; exact validation is in
-[VALIDATION.md](../VALIDATION.md).
+[VALIDATION.md](validation.md).
 
 The current workflow includes opening a side pane or independent window,
 following new images, browsing earlier images, resizing, opening a cached image

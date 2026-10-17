@@ -1,220 +1,148 @@
 # WezTerm Image Panel
 
-Browse images from a local Codex CLI session in a **WezTerm side pane** or a
-separate preview window. Keep working in Codex while the panel follows new
-images, or pause it to inspect an earlier one.
+Show images from a local Codex CLI session in a WezTerm side pane or separate
+window. Browse earlier images while Codex continues, or follow new images.
 
-[中文使用教程](docs/使用教程.md) · [Privacy](docs/privacy.md) ·
-[Validation](VALIDATION.md) · [Contributing](CONTRIBUTING.md)
+[中文教程](docs/使用教程.md) · [Validation](docs/validation.md) ·
+[Privacy](docs/privacy.md) · [Scope](docs/scope.md)
 
-Current scope: **WezTerm + local Codex CLI**, on native Windows and macOS.
-See [scope and future adapters](docs/scope.md) for the project boundaries.
+Independent community tool. Requires **Python 3.9+** and
+[WezTerm](https://wezterm.org/). The runtime has no third-party Python dependencies
+and needs no separate OpenAI API key.
 
-This is an independent community tool. It reads local session files; it does
-not require an OpenAI API key, a Codex fork, or a HUD plugin.
+## Install
 
-## Features
+From a checkout, create a virtual environment and install the package.
 
-- Display inline session images, standard MCP image results, and local images
-  recorded by direct `view_image` calls.
-- Follow the newest image, browse the gallery, and deduplicate identical bytes.
-- Resize images to fit the preview pane without changing their aspect ratio.
-- Toggle a side pane using an optional WezTerm key binding.
-- Select the session explicitly when automatic identification is ambiguous.
-- Run an offline demonstration with generated test cards and no personal logs.
-
-## Requirements and compatibility
-
-- Python **3.9+**; the runtime uses only the Python standard library.
-- [WezTerm](https://wezterm.org/), including its `cli` and `imgcat` commands.
-- A local Codex CLI session log containing image data or supported local image
-  references. Automatic identification uses Codex's local SQLite index and
-  process inspection (`ps`/`lsof` on macOS, PowerShell/CIM on Windows).
-
-Native Windows rendering commands, navigation, and side-pane callbacks have
-been exercised in actual WezTerm processes with Codex CLI 0.163.0. Desktop
-screenshots and physical shortcut presses were not verified in that run.
-Earlier macOS GUI validation has not been rerun; Linux/WSL viewing is
-unvalidated. See the exact [validation boundaries](VALIDATION.md).
-
-Codex's local log and index formats are implementation details, not a stable
-public API. A future Codex update may require an adapter change. Explicit
-`--rollout` selection avoids the automatic identification dependency, but still
-depends on the log format.
-
-## Install from a checkout
-
-Open the project directory in a regular terminal, then create an isolated
-environment:
-
-```sh
-python3 -m venv .venv
-.venv/bin/python -m pip install .
-source .venv/bin/activate
-wezterm-image-panel --version
-```
-
-These commands are for macOS. On Windows, use PowerShell:
+Windows PowerShell:
 
 ```powershell
 python -m venv .venv
-.\.venv\Scripts\python.exe -m pip install .
+.\.venv\Scripts\python.exe -m pip install -e .
 .\.venv\Scripts\python.exe -m wezterm_image_panel --version
 ```
 
-Use that Python executable with `-m wezterm_image_panel` in place of
-`wezterm-image-panel` in the commands below, or activate the environment to use
-the installed command. Some Python distributions use `bin` instead of `Scripts`;
-use the interpreter path actually created by your distribution.
-
-No program changes your WezTerm configuration automatically. The
-`wezterm-image-panel` shell script is an additional macOS/Linux source entry
-point. Windows can run `python wezterm_image_panel.py` directly from this checkout.
-
-## Try it without personal data
-
-From the checkout, with the environment activated:
+macOS:
 
 ```sh
-python examples/create_demo_session.py
-wezterm-image-panel inspect --rollout .codex-local/demo/rollout-demo-session.jsonl
-wezterm-image-panel open --rollout .codex-local/demo/rollout-demo-session.jsonl --standalone
+python3 -m venv .venv
+.venv/bin/python -m pip install -e .
+.venv/bin/python -m wezterm_image_panel --version
 ```
 
-The generator creates three original geometric test cards in an ignored local
-log. It does not read Codex configuration, sessions, credentials, or screenshots.
-It refuses to overwrite an existing file.
+Some Windows Python distributions create `.venv/bin/python.exe` instead of
+`Scripts/python.exe`; use the path actually created. Activate the environment
+to run `wezterm-image-panel`, or use its Python with `-m wezterm_image_panel`.
+These are the two supported entry points. Source code lives under `src/` and
+must be installed before use.
 
-For a live-arrival demonstration, create a new fixture using `--delay 5` in one
-terminal and open that path from another. See [the demo guide](docs/demo.md).
-The public source tree contains no recordings from personal Codex sessions.
+## Open a panel
 
-## Open a real session
-
-List local session IDs and their working directories:
+In a **shell pane**, list your local sessions and choose the intended ID:
 
 ```sh
 wezterm-image-panel sessions --limit 10
-```
-
-Choose the exact session you intend to view. Multiple sessions can share a
-working directory; the newest file is not proof that it is the active session.
-
-```sh
-wezterm-image-panel open --session YOUR_SESSION_ID --standalone
-```
-
-Inside WezTerm, split the current pane instead:
-
-```sh
 wezterm-image-panel open --session YOUR_SESSION_ID
 ```
 
-To place the panel next to another pane, find its ID with `wezterm cli list`:
+`open` splits the invoking WezTerm pane. To place it beside a Codex pane from a
+separate shell, find the Codex pane ID with `wezterm cli list` and pass it:
 
 ```sh
-wezterm-image-panel open --session YOUR_SESSION_ID --pane-id 123 --percent 40
+wezterm-image-panel open --session YOUR_SESSION_ID --pane-id 123
 ```
 
-Replace both placeholders. If session discovery fails, pass the log directly:
+For an independent window, append `--standalone`. You can select a log directly
+with `--rollout /path/to/session.jsonl`; `CODEX_HOME` and `--sessions-dir` control
+session discovery. The newest session is not proof of the active conversation.
 
-```sh
-wezterm-image-panel open --rollout /path/to/session.jsonl --standalone
-```
+## Toggle from the Codex pane
 
-Custom Codex homes are read from `CODEX_HOME`. You can also pass
-`--sessions-dir /path/to/sessions` to session commands.
-
-## Optional toggle shortcut
-
-The supplied [WezTerm example](examples/wezterm.lua) binds **Ctrl + Shift + I**
-on Windows and **Command + Shift + I** on macOS to open or close the panel beside
-the focused Codex pane. Merge that binding
-into your existing configuration; do not replace your entire config.
-
-Set `root` to your checkout location and `command` to the executable in the
-environment you created. The integration accepts an argument array, so paths
-containing spaces work without shell quoting:
+Merge the binding from [examples/wezterm.lua](examples/wezterm.lua) into your
+existing WezTerm configuration. Set `root` to the checkout directory, and install
+its `.venv` as above:
 
 ```lua
-local panel = dofile(root .. '/wezterm_integration.lua')
-local image_action = panel.action {
-  command = { root .. '/.venv/bin/wezterm-image-panel' },
-  size = 0.40,
-}
--- Use image_action as the action of your preferred WezTerm key binding.
+local root = '/path/to/wezterm-image-panel'
+local panel = dofile(root .. '/integrations/wezterm.lua')
+table.insert(config.keys, {
+  key = 'I', mods = 'CTRL|SHIFT', -- macOS: CMD|SHIFT
+  action = panel.action { root = root },
+})
 ```
 
-Set either `command` or `root`. With `{ root = root }`, the module runs
-`python` on Windows or `python3` on other hosts against the source in that
-directory. An explicit `command` is preferable when using a virtual environment.
-There is no fixed checkout path. Automatic identification is for a local Codex
-process; SSH sessions need an explicit accessible log instead. Project-only
-terminal titles require a session selection, even if there is only one candidate.
+Focus the **Codex pane**, then press **Ctrl + Shift + I** on Windows or
+**Command + Shift + I** on macOS. Press again to close the preview. If the
+session cannot be identified uniquely, select one from the preview's list.
+A project-only title requires confirmation even with a single candidate.
+
+`root` locates the checkout's virtual environment, including the Windows `bin`
+variant. For another environment, pass an explicit argument array:
+`command = { '/path/to/python', '-m', 'wezterm_image_panel' }`. With neither
+option, the integration runs `wezterm-image-panel` from WezTerm's PATH.
+No installer modifies your terminal configuration automatically.
 
 ## Viewer keys
+
+Click the preview before using these keys:
 
 | Key | Action |
 | --- | --- |
 | Left / H / K | Previous image; pause following |
 | Right / J | Next image; pause following |
 | Space / L | Toggle follow mode; resuming selects the latest image |
-| O | Open the current cached image in the system image viewer |
-| Q | Close the preview |
+| O | Open the cached image in the system viewer |
+| Q | Close the preview; keep Codex running |
 
-Click the preview pane before using these keys. Closing the preview leaves
-the Codex process running. A panel remains bound to its selected session;
-close and reopen it when switching to a different one.
+A panel stays bound to its selected session. Close and reopen it after switching
+Codex conversations.
 
-## Image and privacy boundaries
-
-PNG, JPEG, GIF, and WebP signatures are supported, up to **32 MiB per image**.
-GIF input does not imply animated playback in the terminal. Plain text paths
-and remote image URLs are not downloaded. A direct `view_image` reference is
-snapshotted when its matching tool completion is observed.
-
-The gallery reads only its selected log. The `sessions` command explicitly
-lists metadata from recent logs. No command executes instructions from logs or
-uploads images. Cached snapshots can remain after the original image changes.
-There is no automatic cache eviction.
-Older pages or archived logs are not automatically merged into the gallery.
-
-- macOS cache: `~/Library/Caches/wezterm-image-panel`
-- Windows cache: `%LOCALAPPDATA%\wezterm-image-panel` (inherits Windows account ACLs)
-- Other hosts: the platform cache directory; `--cache-dir` overrides it.
-- Local logs, captures, and diagnostics belong under ignored `.codex-local/`.
-
-Diagnostic output and screenshots can expose paths, session IDs, and image
-contents. Use synthetic fixtures for public issues and recordings. Read
-[the privacy notes](docs/privacy.md) before sharing evidence.
-
-## Troubleshooting
+## Offline demo and diagnostics
 
 ```sh
+python examples/create_demo_session.py
+wezterm-image-panel open --rollout .codex-local/demo/rollout-demo-session.jsonl --standalone
 wezterm-image-panel doctor
 wezterm-image-panel inspect --session YOUR_SESSION_ID
 ```
 
-`inspect` reports the number of readable images and skipped records. If it
-reports zero, verify the session and whether the image was actually stored
-locally. If WezTerm's existing control interface times out, try `--standalone`.
-If automatic identification cannot read the local index, use `--rollout`.
+The demo generates three original geometric cards without personal logs. See
+[the demo guide](docs/demo.md) for incremental image arrivals.
+
+## Compatibility and privacy
+
+Native Windows rendering commands, navigation, updates, resize, and side-pane
+callbacks have been exercised with WezTerm and Codex CLI 0.163.0. Visual pixel
+inspection and physical shortcut presses remain manual checks. Earlier macOS
+GUI validation has not been rerun for this refactor; Linux/WSL viewing is
+unvalidated. [Validation details](docs/validation.md) distinguish those results
+from the hosted headless tests.
+
+PNG, JPEG, GIF, and WebP are accepted up to 32 MiB each; terminal animation is
+not guaranteed. The gallery reads one selected JSONL, including inline/MCP
+images and supported direct `view_image` references. It does not merge older
+pages, download remote URLs, or upload images. Codex log/index formats are
+internal details and may change. Claude Code has no adapter in this release.
+
+Snapshots stay in the local platform cache, overridable with `--cache-dir`.
+They can outlive the original images; there is no automatic eviction. Logs,
+screenshots, session IDs, and paths can be sensitive. Keep them in ignored
+`.codex-local/` and use synthetic data for public reports.
 
 ## Development
 
 ```sh
-python -m unittest discover -v
+python -m pip install -e .
+python -m unittest discover -s tests -v
 python scripts/check_release.py
 python -m pip install build
 python -m build
 python scripts/check_distributions.py
 ```
 
-Tests use temporary synthetic files and mocked processes. They do not require
-Codex, WezTerm, an API key, or access to real sessions. CI runs headless tests
-on macOS, Linux, and Windows; it does not validate GUI rendering.
+Runtime code is in `src/wezterm_image_panel/`, tests in `tests/`, release tools
+in `scripts/`, and terminal integration in `integrations/`. The CLI and terminal
+integration both launch the installed package. See [CONTRIBUTING.md](CONTRIBUTING.md)
+for the layout and commit rules.
 
-## License
-
-[MIT](LICENSE). See [the publishing notes](docs/publishing.md) for the first
-GitHub upload and commit identity setup.
+[MIT license](LICENSE) · [Publishing notes](docs/publishing.md)

@@ -23,7 +23,7 @@ put access tokens or passwords in a remote URL or in source files.
 ## Review the actual upload set
 
 ```sh
-python -m unittest discover -v
+python -m unittest discover -s tests -v
 python scripts/check_release.py
 git status --short
 git diff --cached --stat
@@ -38,6 +38,6 @@ you create on GitHub. No remote account, repository, or upload is created by
 the setup scripts. Use SSH or your own Git credential manager to authenticate.
 
 Before a tagged release, complete the manual Windows/macOS checklist in
-[VALIDATION.md](../VALIDATION.md) and check the hosted Actions results. A source
+[VALIDATION.md](validation.md) and check the hosted Actions results. A source
 upload can describe GUI validation as pending; it should not claim a verified
 cross-platform release.

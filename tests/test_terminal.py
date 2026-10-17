@@ -2,8 +2,8 @@ import unittest
 from types import SimpleNamespace
 from unittest.mock import Mock, patch
 
-from terminal_io import TerminalInput, WindowsKeys
-from wezterm_image_panel import KeyDecoder
+from wezterm_image_panel.terminal import TerminalInput, WindowsKeys
+from wezterm_image_panel.viewer import KeyDecoder
 
 
 class WindowsKeyboardTests(unittest.TestCase):
@@ -29,5 +29,5 @@ class WindowsKeyboardTests(unittest.TestCase):
         terminal.console = Mock()
         terminal.console.kbhit.side_effect = [True, False]
         terminal.console.getwch.side_effect = ['\xe0', 'K']
-        with patch('terminal_io.os', SimpleNamespace(name='nt')):
+        with patch('wezterm_image_panel.terminal.os', SimpleNamespace(name='nt')):
             self.assertEqual(KeyDecoder().feed(terminal.read(.01)), ['previous'])

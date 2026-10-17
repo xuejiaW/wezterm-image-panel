@@ -58,7 +58,7 @@ demo generates original test cards without reading personal sessions.
 ## Repeatable checks
 
 ```sh
-python -m unittest discover -v
+python -m unittest discover -s tests -v
 python scripts/check_release.py
 wezterm --config-file scripts/check_wezterm.lua show-keys --lua
 python -m pip install build
@@ -75,7 +75,7 @@ formats. Its hosted run remains pending until the repository is published.
 ## Manual checklist before a tagged release
 
 1. Install from a fresh checkout into a new virtual environment.
-2. Generate the [synthetic demo](docs/demo.md), open it in WezTerm, and visually
+2. Generate the [synthetic demo](demo.md), open it in WezTerm, and visually
    inspect the three images, aspect ratio, and footer at different pane sizes.
 3. Press actual arrow/space keys and the configured open/close shortcut. Confirm
    the source Codex pane survives. Open an image externally with `O`.

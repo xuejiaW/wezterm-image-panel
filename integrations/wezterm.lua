@@ -30,14 +30,23 @@ function M.toggle(window, pane, options)
   end
   local cwd_url = pane:get_current_working_dir()
   local cwd = cwd_url and cwd_url.file_path or ''
-  local python = (wezterm.target_triple or ''):find('windows') and 'python' or 'python3'
   local command = options.command
   if not command and options.root then
-    command = { python, options.root .. '/wezterm_image_panel.py' }
+    local windows = (wezterm.target_triple or ''):find('windows') ~= nil
+    local paths = windows and { '/.venv/Scripts/python.exe', '/.venv/bin/python.exe' }
+      or { '/.venv/bin/python' }
+    for _, suffix in ipairs(paths) do
+      local path = options.root .. suffix
+      local file = io.open(path, 'rb')
+      if file then
+        file:close()
+        command = { path, '-m', 'wezterm_image_panel' }
+        break
+      end
+    end
   end
   if not command then
-    window:toast_notification('WezTerm Image Panel', 'Set command or root in panel.action options.', nil, 4000)
-    return
+    command = { 'wezterm-image-panel' }
   end
   local args = {}
   for _, value in ipairs(command) do table.insert(args, value) end

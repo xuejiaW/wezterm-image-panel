@@ -1,6 +1,7 @@
-include README.md VALIDATION.md CHANGELOG.md CONTRIBUTING.md SECURITY.md
-include wezterm-image-panel wezterm_integration.lua preview.wezterm.lua
-include test_*.py
+include README.md CHANGELOG.md CONTRIBUTING.md SECURITY.md
+recursive-include src *.py *.lua
+recursive-include integrations *.lua
+recursive-include tests *.py
 recursive-include docs *.md
 recursive-include examples *.py *.lua
 recursive-include scripts *.py *.lua

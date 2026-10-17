@@ -4,7 +4,8 @@ from pathlib import Path
 import tempfile
 import unittest
 
-from wezterm_image_panel import SessionImages, image_dimensions, KeyDecoder
+from wezterm_image_panel.sessions import SessionImages
+from wezterm_image_panel.viewer import image_dimensions, KeyDecoder
 
 PNG = base64.b64decode('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+a3ioAAAAASUVORK5CYII=')
 
