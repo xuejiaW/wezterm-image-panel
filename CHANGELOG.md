@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.4.1 — Package structure and development workflow
+
+- Move runtime code into a `src` package and regression tests into `tests/`.
+- Use the installed console command or Python module for all launches.
+- Ship the standalone WezTerm profile inside the package.
+- Move the Lua integration to `integrations/` and detect both Windows virtual
+  environment layouts when a checkout root is configured.
+- Check Angular commit messages through a local hook and GitHub Actions.
+
 ## 0.4.0 — WezTerm Image Panel / native Windows
 
 - Adopt the WezTerm Image Panel project, package, and command names.

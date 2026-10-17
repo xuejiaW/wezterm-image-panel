@@ -22,6 +22,35 @@ python scripts/check_release.py
 Use `wezterm-image-panel` or `python -m wezterm_image_panel`. Do not add a second
 launcher or expose internal module files as user entry points.
 
+## Commit messages
+
+Follow the [Angular commit format](https://github.com/angular/angular/blob/main/contributing-docs/commit-message-guidelines.md):
+`type(scope): summary`, with an optional scope. Use `build`, `ci`, `docs`, `feat`,
+`fix`, `perf`, `refactor`, or `test`. Start the summary in lowercase, use an
+imperative verb, and omit its final period. This project limits headers to 100
+characters. Explain the motivation in a body of at least 20 characters, separated
+by a blank line; `docs` may omit the body. Put breaking changes in a
+`BREAKING CHANGE:` footer. Prefer scopes such as `cli`, `packaging`, `terminal`,
+`sessions`, and `wezterm` when they clarify the change.
+
+```text
+refactor(packaging): separate runtime code from development files
+
+Keep the installed package independent of tests and release scripts so the
+source checkout cannot hide missing package contents during validation.
+```
+
+Enable the local hook once per checkout:
+
+```sh
+git config --local core.hooksPath .githooks
+```
+
+The hook and CI use `scripts/check_commits.py` without Node.js dependencies.
+CI checks commits introduced by the push or pull request. The original public
+commit predates this enforcement; renaming it requires a coordinated history
+rewrite rather than a normal follow-up commit.
+
 With WezTerm installed, `wezterm --config-file scripts/check_wezterm.lua show-keys
 --lua` exercises the Lua integration using mock panes without opening a GUI.
 

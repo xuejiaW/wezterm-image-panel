@@ -1,0 +1,3 @@
+#!/bin/sh
+task_root=$(git rev-parse --show-toplevel) || exit 1
+exec python "$task_root/scripts/check_commits.py" --message-file "$1"
