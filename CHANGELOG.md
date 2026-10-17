@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.4.2 — macOS Codex helper process detection
+
+- Filter non-interactive Codex commands such as `app-server`, `exec-server`,
+  `mcp-server`, and `exec` before resolving a POSIX pane's active conversation.
+- Resolve a reported helper/tool process to its interactive Codex ancestor.
+- Retain ambiguity checks for multiple real interactive sessions, and distinguish
+  that case from missing terminal/process information in error messages.
+- Test real POSIX `ps` output with an isolated pseudo-terminal and synthetic
+  processes, without invoking Codex or reading personal session data.
 ## 0.4.1 — Package structure and development workflow
 
 - Move runtime code into a `src` package and regression tests into `tests/`.

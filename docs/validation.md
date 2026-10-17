@@ -1,5 +1,18 @@
 # Validation and support scope
 
+## 0.4.2 macOS process detection regression — 2026-10-17
+
+The reported failure was reproduced with a synthetic process tree containing
+one interactive Codex and a same-terminal `codex app-server`. Additional cases
+cover a reported helper PID, helper-only trees, multiple real TUIs, global CLI
+options, executable paths with spaces, missing command details, and unknown TTYs.
+
+The Windows run passes 48 tests and skips one POSIX-only integration test. That
+integration test creates an isolated pseudo-terminal and two waiting stand-in
+executables named `codex`, one with the `app-server` argument. It uses actual
+`ps` output on macOS/Linux CI; it does not launch Codex or inspect personal data.
+This verifies native process selection rather than WezTerm GUI appearance.
+
 ## 0.4.1 package refactor — 2026-10-17
 
 - 41 local automated tests passed after moving runtime code into `src/` and

@@ -1,13 +1,19 @@
 import json
+import os
 from pathlib import Path
+import shutil
+import signal
 import sqlite3
 import subprocess
+import sys
 import tempfile
+import time
 import unittest
 from unittest.mock import patch
 
 from wezterm_image_panel.detection import (detect, state_candidates, opened_rollouts,
-                               resolve_posix_codex_pid, resolve_windows_codex_pid)
+                               resolve_posix_codex_pid, resolve_windows_codex_pid,
+                               is_interactive_codex)
 
 
 class DetectionTests(unittest.TestCase):
@@ -96,8 +102,8 @@ class DetectionTests(unittest.TestCase):
 
     @patch('wezterm_image_panel.detection.subprocess.run')
     def test_powershell_foreground_group_resolves_codex_child_only_on_same_tty(self, run):
-        run.side_effect = [subprocess.CompletedProcess([],0,stdout='/usr/bin/pwsh\n'),
-            subprocess.CompletedProcess([],0,stdout='42 1 ttys003 /usr/bin/pwsh\n43 42 ttys003 /opt/bin/codex\n44 43 ?? /opt/bin/codex\n45 1 ttys004 /opt/bin/codex\n')]
+        run.side_effect = [subprocess.CompletedProcess([],0,stdout='42 1 ttys003 /usr/bin/pwsh\n43 42 ttys003 /opt/bin/codex\n44 43 ?? /opt/bin/codex\n45 1 ttys004 /opt/bin/codex\n'),
+                           subprocess.CompletedProcess([],0,stdout='43 /opt/bin/codex\n')]
         self.assertEqual(resolve_posix_codex_pid(42),43)
 
     @patch('wezterm_image_panel.detection.opened_rollouts', return_value=[])
@@ -122,6 +128,122 @@ class DetectionTests(unittest.TestCase):
             resolve_windows_codex_pid(10)
         with self.assertRaises(ValueError):
             resolve_windows_codex_pid(99)
+
+
+class PosixProcessTests(unittest.TestCase):
+    def process_query(self, rows, commands):
+        """Supply synthetic ps output for both the old and new query shapes."""
+        def query(args, **kwargs):
+            if args[-1] == 'comm=':
+                pid = int(args[args.index('-p') + 1])
+                output = rows[pid][2] + '\n'
+            elif args[-1] == 'pid=,args=':
+                output = ''.join(f'{pid} {command}\n' for pid, command in commands.items())
+            else:
+                output = ''.join(f'{pid} {parent} {tty} {executable}\n'
+                                 for pid, (parent, tty, executable) in rows.items())
+            return subprocess.CompletedProcess(args, 0, stdout=output)
+        return patch('wezterm_image_panel.detection.subprocess.run', side_effect=query)
+
+    def test_same_terminal_app_server_is_not_a_second_codex_session(self):
+        rows = {42: (1, 'ttys003', '/bin/zsh'),
+                43: (42, 'ttys003', '/opt/bin/codex'),
+                44: (43, 'ttys003', '/opt/bin/codex')}
+        with self.process_query(rows, {43: '/opt/bin/codex resume example',
+                                       44: '/opt/bin/codex app-server --listen stdio://'}):
+            self.assertEqual(resolve_posix_codex_pid(42), 43)
+
+    def test_reported_helper_pid_resolves_to_its_interactive_ancestor(self):
+        rows = {42: (1, 'ttys003', '/bin/zsh'),
+                43: (42, 'ttys003', '/opt/bin/codex'),
+                44: (43, 'ttys003', '/opt/bin/codex')}
+        with self.process_query(rows, {43: '/opt/bin/codex', 44: '/opt/bin/codex app-server'}):
+            self.assertEqual(resolve_posix_codex_pid(44), 43)
+
+    def test_helper_without_a_tui_is_not_accepted_as_a_session(self):
+        rows = {42: (1, 'ttys003', '/bin/zsh'), 44: (42, 'ttys003', '/opt/bin/codex')}
+        with self.process_query(rows, {44: '/opt/bin/codex app-server'}):
+            with self.assertRaisesRegex(ValueError, '未找到交互式 Codex'):
+                resolve_posix_codex_pid(42)
+
+    def test_two_real_interactive_sessions_still_require_explicit_selection(self):
+        rows = {42: (1, 'ttys003', '/bin/zsh'),
+                43: (42, 'ttys003', '/opt/bin/codex'),
+                44: (43, 'ttys003', '/opt/bin/codex'),
+                45: (42, 'ttys003', '/opt/bin/codex')}
+        with self.process_query(rows, {43: '/opt/bin/codex resume first',
+                                       44: '/opt/bin/codex app-server',
+                                       45: '/opt/bin/codex fork second'}):
+            with self.assertRaisesRegex(ValueError, '多个交互式 Codex'):
+                resolve_posix_codex_pid(42)
+
+    def test_helpers_with_global_options_are_filtered_without_matching_prompt_text(self):
+        for command in ('codex app-server', 'codex --config model="demo" app-server',
+                        'codex --profile demo exec --json -', 'codex mcp-server'):
+            with self.subTest(command=command):
+                self.assertFalse(is_interactive_codex(command, '/opt/bin/codex'))
+        for command in ('codex resume example', 'codex --model app-server',
+                        'codex check the app-server output', 'codex -- app-server',
+                        'codex inspect the app-server\'s logs'):
+            with self.subTest(command=command):
+                self.assertTrue(is_interactive_codex(command, '/opt/bin/codex'))
+
+    def test_executable_paths_with_spaces_and_unknown_ttys(self):
+        path = '/opt/demo tools/codex'
+        self.assertFalse(is_interactive_codex(path + ' app-server', path))
+        self.assertTrue(is_interactive_codex(path + ' resume example', path))
+        for tty in ('?', '??', '-'):
+            with self.subTest(tty=tty), self.process_query({42: (1, tty, path)}, {42: path}):
+                with self.assertRaisesRegex(ValueError, '终端信息'):
+                    resolve_posix_codex_pid(42)
+
+    def test_missing_command_details_do_not_select_a_remaining_candidate(self):
+        rows = {42: (1, 'ttys003', '/bin/zsh'),
+                43: (42, 'ttys003', '/opt/bin/codex'),
+                44: (43, 'ttys003', '/opt/bin/codex')}
+        with self.process_query(rows, {43: '/opt/bin/codex'}):
+            with self.assertRaisesRegex(ValueError, '运行模式'):
+                resolve_posix_codex_pid(42)
+
+    @unittest.skipUnless(os.name == 'posix', 'Requires native POSIX ps and a pseudo-terminal')
+    def test_native_ps_distinguishes_same_tty_helper_processes(self):
+        # The stand-in executables only wait on stdin/a FIFO. No real Codex,
+        # authentication, user sessions, compiler, or GUI is involved.
+        import pty
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            shutil.copy2(shutil.which('cat'), root / 'codex')
+            os.mkfifo(root / 'app-server')
+            script = (
+                'import fcntl,json,subprocess,sys,termios,time; from pathlib import Path; '
+                'fcntl.ioctl(0,termios.TIOCSCTTY,0); root=Path(sys.argv[1]); '
+                'tui=subprocess.Popen([str(root/"codex")]); '
+                'helper=subprocess.Popen([str(root/"codex"),"app-server"],cwd=root); '
+                '(root/"ready.json").write_text(json.dumps({"tui":tui.pid,"helper":helper.pid})); '
+                'time.sleep(20)'
+            )
+            master, slave = pty.openpty()
+            harness = subprocess.Popen([sys.executable, '-c', script, directory],
+                                       stdin=slave, stdout=subprocess.DEVNULL,
+                                       stderr=subprocess.PIPE, start_new_session=True)
+            try:
+                deadline = time.monotonic() + 5
+                while not (root / 'ready.json').exists() and time.monotonic() < deadline:
+                    if harness.poll() is not None:
+                        self.fail(harness.stderr.read().decode(errors='replace'))
+                    time.sleep(.02)
+                self.assertTrue((root / 'ready.json').exists(), 'Process fixture failed to initialize')
+                ready = json.loads((root / 'ready.json').read_text())
+                self.assertEqual(resolve_posix_codex_pid(harness.pid), ready['tui'])
+            finally:
+                try:
+                    os.killpg(harness.pid, signal.SIGTERM)
+                except ProcessLookupError:
+                    pass
+                harness.wait(timeout=5)
+                harness.stderr.close()
+                os.close(slave)
+                os.close(master)
 
 
 if __name__ == '__main__':

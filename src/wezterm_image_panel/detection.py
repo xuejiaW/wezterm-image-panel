@@ -7,6 +7,7 @@ from contextlib import closing
 import os
 from pathlib import Path
 import re
+import shlex
 import sqlite3
 import subprocess
 
@@ -130,30 +131,105 @@ def resolve_windows_codex_pid(pid):
     raise ValueError('当前窗格没有唯一的 Codex 进程。请先点击 Codex 所在窗格，再按快捷键。')
 
 
+def is_interactive_codex(command, executable):
+    """Recognize the CLI mode without searching prompts for helper keywords."""
+    command = command.strip()
+    for prefix in sorted({executable, shlex.quote(executable), Path(executable).name}, key=len, reverse=True):
+        if command == prefix or command.startswith(prefix + ' '):
+            command = command[len(prefix):].lstrip()
+            break
+    else:
+        # argv[0] can use a symlink path rather than ps's executable path.
+        program, _, command = command.partition(' ')
+        if Path(program).name != 'codex':
+            raise ValueError('无法识别 Codex 的运行模式。请重试，或使用 open --rollout FILE。')
+    lexer = shlex.shlex(command, posix=True)
+    lexer.whitespace_split = True
+    lexer.commenters = ''
+    value_options = {'-c', '--config', '-m', '--model', '-p', '--profile',
+                     '-s', '--sandbox', '-a', '--ask-for-approval', '-C', '--cd',
+                     '--add-dir', '--enable', '--disable', '--remote',
+                     '--remote-auth-token-env', '--local-provider', '-i', '--image'}
+    helpers = {'app-server', 'exec-server', 'mcp-server', 'exec', 'e', 'review',
+               'login', 'logout', 'mcp', 'plugin', 'remote-control', 'app',
+               'completion', 'update', 'doctor', 'sandbox', 'debug', 'apply', 'a',
+               'queue', 'archive', 'delete', 'migrate-rollouts', 'unarchive',
+               'features', 'help', 'agents', 'cloud'}
+    try:
+        for token in lexer:
+            if token == '--':
+                return True
+            if token in ('--help', '-h', '--version', '-V'):
+                return False
+            option, equals, _ = token.partition('=')
+            if option in value_options and not equals:
+                next(lexer, None)
+            elif not token.startswith('-'):
+                # resume/fork and ordinary initial prompts remain interactive.
+                return token not in helpers
+    except ValueError:
+        # ps prints flattened argv; quotes in a prompt need not be shell syntax.
+        # Keep an unrecognized mode as a candidate instead of silently losing it.
+        return True
+    return True
+
+
+def posix_codex_commands(pids):
+    if not pids:
+        return {}
+    result = subprocess.run(['ps', '-ww', '-p', ','.join(map(str, sorted(pids))),
+                             '-o', 'pid=,args='], capture_output=True, text=True, timeout=2)
+    commands = {}
+    for line in result.stdout.splitlines():
+        cells = line.strip().split(None, 1)
+        if len(cells) == 2 and cells[0].isdigit():
+            commands[int(cells[0])] = cells[1]
+    if result.returncode or any(pid not in commands for pid in pids):
+        raise ValueError('无法读取 Codex 进程的运行模式。请重试，或使用 open --rollout FILE。')
+    return commands
+
+
 def resolve_posix_codex_pid(pid):
-    result = subprocess.run(['ps', '-p', str(pid), '-o', 'comm='], capture_output=True, text=True, timeout=2)
-    if result.returncode == 0 and Path(result.stdout.strip()).name.lower() == 'codex':
-        return pid
     # On macOS WezTerm can report PowerShell's foreground process group leader,
     # even while the child Codex TUI owns the terminal input. Walk that tree.
-    result = subprocess.run(['ps', '-axo', 'pid=,ppid=,tty=,comm='], capture_output=True, text=True, timeout=2)
+    result = subprocess.run(['ps', '-ww', '-axo', 'pid=,ppid=,tty=,comm='], capture_output=True, text=True, timeout=2)
     processes = {}
     for line in result.stdout.splitlines():
         cells = line.split(None, 3)
         if len(cells) == 4 and cells[0].isdigit() and cells[1].isdigit():
             processes[int(cells[0])] = (int(cells[1]), cells[2], cells[3])
     source_tty = processes.get(pid, (0, '??', ''))[1]
+    if result.returncode or source_tty in ('??', '?', '-'):
+        raise ValueError('无法读取源窗格的本机终端信息。请使用 open --rollout FILE 显式选择日志。')
     descendants = {pid}
     while True:
         expanded = descendants | {p for p, info in processes.items() if info[0] in descendants}
         if expanded == descendants:
             break
         descendants = expanded
-    candidates = [p for p in descendants if p in processes and source_tty != '??'
-                  and processes[p][1] == source_tty and Path(processes[p][2]).name.lower() == 'codex']
+    ancestors, current = set(), pid
+    while current in processes and current not in ancestors:
+        ancestors.add(current)
+        current = processes[current][0]
+    related = descendants | ancestors
+    codex = {p for p in related if p in processes and processes[p][1] == source_tty
+             and Path(processes[p][2]).name.lower() == 'codex'}
+    commands = posix_codex_commands(codex)
+    interactive = {p for p in codex if is_interactive_codex(commands[p], processes[p][2])}
+    # A directly reported TUI (or a tool below it) supplies stronger identity
+    # than other descendants of a shell/process-group leader.
+    current, visited = pid, set()
+    while current in processes and current not in visited:
+        visited.add(current)
+        if current in interactive:
+            return current
+        current = processes[current][0]
+    candidates = list(interactive & descendants)
     if len(candidates) == 1:
         return candidates[0]
-    raise ValueError('当前窗格没有唯一的 Codex 进程。请先点击 Codex 所在窗格，再按快捷键。')
+    if candidates:
+        raise ValueError('找到多个交互式 Codex 进程，无法唯一确定当前会话。请使用 open --rollout FILE 显式选择日志。')
+    raise ValueError('未找到交互式 Codex 终端进程（后台辅助进程不会作为会话）。请使用 open --rollout FILE 显式选择日志。')
 
 
 def resolve_codex_pid(pid):

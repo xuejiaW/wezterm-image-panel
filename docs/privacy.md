@@ -13,6 +13,9 @@ index. It can display candidate session names and working directories when a
 choice is required. It does not choose a session merely because it is newest.
 Windows process inspection reads IDs, parent IDs, and executable names through
 PowerShell/CIM; it does not request command lines or process environments.
+On POSIX hosts, detection reads command lines only for related Codex candidates
+on the source terminal to distinguish interactive sessions from helper modes.
+It does not execute or log those command lines, or request process environments.
 
 ## What it writes
 
