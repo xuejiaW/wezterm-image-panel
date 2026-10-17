@@ -212,14 +212,18 @@ class PosixProcessTests(unittest.TestCase):
         import pty
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
-            shutil.copy2(shutil.which('cat'), root / 'codex')
+            # macOS system binaries carry protected flags that must not be
+            # copied onto a temporary stand-in. Copy bytes and set our mode.
+            shutil.copyfile(shutil.which('cat'), root / 'codex')
+            (root / 'codex').chmod(0o700)
             os.mkfifo(root / 'app-server')
             script = (
                 'import fcntl,json,subprocess,sys,termios,time; from pathlib import Path; '
                 'fcntl.ioctl(0,termios.TIOCSCTTY,0); root=Path(sys.argv[1]); '
                 'tui=subprocess.Popen([str(root/"codex")]); '
                 'helper=subprocess.Popen([str(root/"codex"),"app-server"],cwd=root); '
-                '(root/"ready.json").write_text(json.dumps({"tui":tui.pid,"helper":helper.pid})); '
+                '(root/"ready.tmp").write_text(json.dumps({"tui":tui.pid,"helper":helper.pid})); '
+                '(root/"ready.tmp").replace(root/"ready.json"); '
                 'time.sleep(20)'
             )
             master, slave = pty.openpty()
