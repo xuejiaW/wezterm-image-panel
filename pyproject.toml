@@ -1,0 +1,32 @@
+[build-system]
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "wezterm-image-panel"
+version = "0.4.0"
+description = "Browse images from a local Codex CLI session in a WezTerm pane"
+readme = "README.md"
+license = "MIT"
+license-files = ["LICENSE"]
+requires-python = ">=3.9"
+dependencies = []
+keywords = ["codex", "wezterm", "terminal", "images"]
+classifiers = [
+  "Development Status :: 3 - Alpha",
+  "Environment :: Console",
+  "Operating System :: MacOS",
+  "Operating System :: Microsoft :: Windows",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3 :: Only",
+  "Topic :: Utilities",
+]
+
+[project.scripts]
+wezterm-image-panel = "wezterm_image_panel:main"
+
+[tool.setuptools]
+py-modules = ["wezterm_image_panel", "session_detection", "terminal_io"]
+
+[tool.setuptools.data-files]
+"share/wezterm-image-panel" = ["wezterm_integration.lua", "preview.wezterm.lua"]

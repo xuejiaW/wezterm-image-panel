@@ -1,0 +1,31 @@
+# Private recordings, sessions, diagnostics, and original local material
+/.codex-local/
+/evidence/
+*.jsonl
+*.sqlite
+*.sqlite-*
+*.log
+.env
+.env.*
+!.env.example
+
+# Python environments and build output
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+build/
+dist/
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Operating systems and editors
+.DS_Store
+Thumbs.db
+Desktop.ini
+.idea/
+.vscode/
+*.swp
+*.swo
