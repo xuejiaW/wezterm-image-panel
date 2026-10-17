@@ -1,5 +1,22 @@
 # Validation and support scope
 
+## 0.4.1 package refactor — 2026-10-17
+
+- 41 local automated tests passed after moving runtime code into `src/` and
+  tests into `tests/`, including commit-message validation and explicit side-pane
+  ownership. The moved parsing/rendering functions retain their original ASTs.
+- The package installed into a fresh environment outside the checkout's module
+  path. Version/help, synthetic image inspection, and the packaged standalone
+  profile passed. Wheel and source archive privacy checks passed.
+- The current local Codex conversation opened beside its source pane in native
+  Windows WezTerm. Two images were parsed with zero errors and successful image
+  rendering commands. User-specific configuration and diagnostics remain local.
+- The WezTerm configuration loader accepted the Ctrl+Shift+I callback binding.
+  A physical key press and pixel-level screenshot review remain manual checks.
+- The original public CI run passed all seven platform/package jobs. The current
+  workflow additionally checks new commit messages; it does not retroactively
+  rename the original published commit.
+
 ## 0.4.0 preparation — 2026-10-17
 
 Local environment: native Windows, Python 3.12.9, WezTerm

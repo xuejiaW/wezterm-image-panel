@@ -32,6 +32,8 @@ def main(argv=None):
             p.add_argument("--new-window", action="store_true")
             p.add_argument("--standalone", action="store_true", help="Independent WezTerm preview window with a minimal profile")
             p.add_argument("--percent", type=int, default=40)
+        if name == "view":
+            p.add_argument("--source-pane", default="", help=argparse.SUPPRESS)
     p = sub.add_parser("sessions", help="List recent session IDs and working directories")
     p.add_argument("--sessions-dir", type=Path)
     p.add_argument("--limit", type=int, default=15)
@@ -53,10 +55,10 @@ def main(argv=None):
                 raise ValueError("Polling interval must be a finite number of at least 0.05 seconds")
         if args.command == "sessions" and args.limit < 1:
             raise ValueError("--limit must be at least 1")
+        if args.command in ("auto-view", "view") and args.source_pane:
+            owner = base64.b64encode(args.source_pane.encode()).decode()
+            print('\x1b]1337;SetUserVar=WEZTERM_IMAGE_PANEL_OWNER=' + owner + '\x07', end='', flush=True)
         if args.command in ("auto-view", "identify"):
-            if args.command == 'auto-view' and args.source_pane:
-                owner = base64.b64encode(args.source_pane.encode()).decode()
-                print('\x1b]1337;SetUserVar=WEZTERM_IMAGE_PANEL_OWNER=' + owner + '\x07', end='', flush=True)
             from .detection import detect
             candidates = detect(args.source_pid, args.source_title, args.source_cwd)
             if args.command == "identify":
@@ -133,6 +135,7 @@ def main(argv=None):
                     raise ValueError("Run inside WezTerm, specify --pane-id, or use --new-window.")
                 if not 10 <= args.percent <= 80:
                     raise ValueError("--percent must be between 10 and 80")
+                child += ["--source-pane", str(pane)]
                 command = [binary, "cli", "split-pane", "--pane-id", str(pane), "--right", "--percent", str(args.percent), "--"] + child
             subprocess.run(command, check=True, timeout=10)
         return 0

@@ -96,6 +96,16 @@ class PublicReleaseTests(unittest.TestCase):
         self.assertEqual(status, 1)
         self.assertIn('needs a terminal', err)
 
+    def test_explicit_side_pane_remembers_its_owner_for_the_toggle(self):
+        rollout = create(self.root / 'demo.jsonl')
+        with patch('wezterm_image_panel.cli.wezterm_binary', return_value='wezterm'), \
+                patch('wezterm_image_panel.cli.subprocess.run') as spawn:
+            status, out, err = self.run_cli(['open', '--rollout', str(rollout), '--pane-id', '7'])
+        self.assertEqual((status, err), (0, ''))
+        command = spawn.call_args.args[0]
+        self.assertEqual(command[-2:], ['--source-pane', '7'])
+        self.assertEqual(command[command.index('-m') + 1], 'wezterm_image_panel')
+
     def test_release_guard_rejects_private_artifacts_and_identifiers(self):
         self.assertTrue(findings('.codex-local/capture.txt', b'private'))
         self.assertTrue(findings('session.jsonl', b'{}'))

@@ -8,6 +8,8 @@
 - Move the Lua integration to `integrations/` and detect both Windows virtual
   environment layouts when a checkout root is configured.
 - Check Angular commit messages through a local hook and GitHub Actions.
+- Preserve pane ownership for directly opened side panes so the toggle shortcut
+  can close them as well.
 
 ## 0.4.0 — WezTerm Image Panel / native Windows
 
